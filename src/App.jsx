@@ -52,6 +52,56 @@ function Reveal({ children, delay = 0, className = "", style = {} }) {
   return (<div ref={ref} className={className} style={{ ...style, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(28px)", transition: `opacity 0.7s cubic-bezier(.22,1,.36,1) ${delay}s, transform 0.7s cubic-bezier(.22,1,.36,1) ${delay}s` }}>{children}</div>);
 }
 
+// Fade-only animation (no transform) — needed for elements that contain backdrop-filter,
+// since transform on an ancestor breaks backdrop-filter rendering.
+function FadeIn({ children, delay = 0, className = "", style = {} }) {
+  const [ref, visible] = useReveal();
+  return (<div ref={ref} className={className} style={{ ...style, opacity: visible ? 1 : 0, transition: `opacity 0.8s cubic-bezier(.22,1,.36,1) ${delay}s` }}>{children}</div>);
+}
+
+// Renders a list of items separated by a bullet "·". The separator is hidden
+// before any item that wraps onto a new line, so each line starts cleanly.
+function SmartSeparatorList({ items, separator = " \u00B7 ", style = {} }) {
+  const containerRef = useRef(null);
+  const [hideBefore, setHideBefore] = useState(new Set());
+
+  useEffect(() => {
+    const recompute = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const spans = Array.from(container.querySelectorAll("[data-kw]"));
+      const newHide = new Set();
+      let prevTop = null;
+      spans.forEach((el, i) => {
+        const top = el.offsetTop;
+        if (i > 0 && top !== prevTop) newHide.add(i);
+        prevTop = top;
+      });
+      setHideBefore(prev => {
+        if (prev.size === newHide.size && [...prev].every(v => newHide.has(v))) return prev;
+        return newHide;
+      });
+    };
+    recompute();
+    const obs = new ResizeObserver(recompute);
+    if (containerRef.current) obs.observe(containerRef.current);
+    window.addEventListener("resize", recompute);
+    const timer = setTimeout(recompute, 200);
+    return () => { obs.disconnect(); window.removeEventListener("resize", recompute); clearTimeout(timer); };
+  }, [items]);
+
+  return (
+    <span ref={containerRef} style={style}>
+      {items.map((item, i) => (
+        <span key={i} data-kw style={{ display: "inline-block" }}>
+          {i > 0 && !hideBefore.has(i) && <span style={{ color: "#bbb" }} aria-hidden="true">{separator}</span>}
+          <span style={{ whiteSpace: "nowrap" }}>{item}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function Nav({ active, onNavigate }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -97,7 +147,7 @@ function PubCard({ year, title, authors, journal, link, badges, abstract, delay 
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#777", lineHeight: 1.5 }}>{authors}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "#aaa", marginTop: 3, fontStyle: "italic" }}>{journal}</div>
               {badges && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>{badges.map((b, i) => (
-                <span key={i} style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, padding: "2px 8px", borderRadius: 20, background: b.color || "#f0ebe3", color: b.textColor || "#8a7a66", fontWeight: 500, letterSpacing: "0.03em" }}>{b.label}</span>
+                <span key={i} style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, padding: "2px 8px", borderRadius: 20, background: b.color || "#f0ebe3", color: b.textColor || "#8a7a66", fontWeight: 500, letterSpacing: "0.03em", whiteSpace: "nowrap" }}>{b.label}</span>
               ))}</div>}
             </div>
             <span style={{ fontSize: 16, transition: "transform 0.3s, color 0.3s", transform: hov ? "translateX(4px)" : "none", color: hov ? "#1a1a1a" : "#bbb", paddingTop: 4 }}>{"\u2197"}</span>
@@ -181,7 +231,7 @@ function RoleModelCarousel({ title, people }) {
 
 const PUBLICATIONS = [
   { year: "2025", title: "Revisiting the Thermal Transitions of PDMS Elastomers: Addressing Common Misconceptions", authors: "Utrera-Barrios S, Yu L, Skov AL", journal: "Macromol. Mater. Eng. 310, 2500075 (Q2)", link: "https://doi.org/10.1002/mame.202500075", badges: [{ label: "Q2" }], abstract: "An important characteristic of silicone elastomers is their ability to maintain their properties over a wide temperature range. This results from the Si\u2500O bond's high flexibility and thermal stability, causing a very low glass transition temperature (Tg) and a high degradation temperature (Td), respectively. However, other thermal transitions, such as crystallization (Tc), cold crystallization (Tcc), and melting (Tm), must also be considered to ensure the elastomers' optimal performance and use. This study addresses the misconceptions surrounding the assignment of these transition temperatures for the most prevalent type of silicone elastomer, namely polydimethylsiloxane (PDMS) elastomers. The article focuses on rectifying these misunderstandings, particularly in the context of high-tech applications, including aerospace, automotive, coatings, and soft robotics. A diverse range of 15 types of silicones are meticulously analyzed, including elastomers, adhesives, and oils, using differential scanning calorimetry (DSC), dynamic mechanical analysis (DMA), and thermogravimetric analysis (TGA). This study highlights these transition temperatures' role in shaping silicone elastomers' thermomechanical behavior and their significance for effective utilization in advanced applications." },
-  { year: "2024", title: "Unlocking the Potential of Self-Healing and Recyclable Ionic Elastomers for Soft Robotics", authors: "Utrera-Barrios S, Steenackers N, Terryn S, et al.", journal: "Mater. Horiz. 11, 708\u2013725 (D1, Invited)", link: "https://doi.org/10.1039/D3MH01312J", badges: [{ label: "D1", color: "#e3d5b8", textColor: "#7a6a46" }, { label: "Invited" }, { label: "Highlighted in the collection 10 Years of Mater. Horiz." }], abstract: "In the field of soft robotics, current materials face challenges related to their load capacity, durability, and sustainability. Innovative solutions are required to address these problems beyond conventional strategies, which often lack long-term ecological viability. This study aims to overcome these limitations using mechanically robust, self-healing, and recyclable ionic elastomers based on carboxylated nitrile rubber (XNBR). The designed materials exhibited excellent mechanical properties, including tensile strengths (TS) exceeding 19 MPa and remarkable deformability, with maximum elongations (EB) over 650%. Moreover, these materials showed high self-healing capabilities, with 100% recovery efficiency of TS and EB at 110 \u00B0C after 3 to 5 h, and full recyclability, preserving their mechanical performance even after three recycling cycles. Furthermore, they were also moldable and readily scalable. Tendon-driven soft robotic grippers were successfully developed out of ionic elastomers, illustrating the potential of self-healing and recyclability in the field of soft robotics to reduce maintenance costs, increase material durability, and improve sustainability." },
+  { year: "2024", title: "Unlocking the Potential of Self-Healing and Recyclable Ionic Elastomers for Soft Robotics", authors: "Utrera-Barrios S, Steenackers N, Terryn S, et al.", journal: "Mater. Horiz. 11, 708\u2013725 (D1, Invited)", link: "https://doi.org/10.1039/D3MH01312J", badges: [{ label: "D1", color: "#e3d5b8", textColor: "#7a6a46" }, { label: "Invited" }, { label: "Highlighted in 10 Years of Mater. Horiz." }], abstract: "In the field of soft robotics, current materials face challenges related to their load capacity, durability, and sustainability. Innovative solutions are required to address these problems beyond conventional strategies, which often lack long-term ecological viability. This study aims to overcome these limitations using mechanically robust, self-healing, and recyclable ionic elastomers based on carboxylated nitrile rubber (XNBR). The designed materials exhibited excellent mechanical properties, including tensile strengths (TS) exceeding 19 MPa and remarkable deformability, with maximum elongations (EB) over 650%. Moreover, these materials showed high self-healing capabilities, with 100% recovery efficiency of TS and EB at 110 \u00B0C after 3 to 5 h, and full recyclability, preserving their mechanical performance even after three recycling cycles. Furthermore, they were also moldable and readily scalable. Tendon-driven soft robotic grippers were successfully developed out of ionic elastomers, illustrating the potential of self-healing and recyclability in the field of soft robotics to reduce maintenance costs, increase material durability, and improve sustainability." },
   { year: "2024", title: "Recyclability and Self-Healing Capability in Reinforced Ionic Elastomers", authors: "Utrera-Barrios S, Mas-Giner I, Verdugo Manzanares R, et al.", journal: "Polymer 310, 127468 (Q2)", link: "https://doi.org/10.1016/j.polymer.2024.127468", badges: [{ label: "Q2" }], abstract: "This study presents a comparative analysis of different sustainable alternatives for producing reinforced ionic elastomers that are not just mechanically robust but also excellent in recyclability and self-healing, marking a significant advancement in sustainable materials science. Ionically crosslinked carboxylated nitrile rubber (XNBR) was combined with conventional (carbon black and silica) and sustainable (cellulose and ground tire rubber) fillers. The sustainable fillers not only enhanced the mechanical performance (reinforcing character) but also maintained high healing efficiencies (>80%). Notably, the incorporation of just 10 phr of waste-based ground tire rubber (GTR) produced by water jet grinding (WJ-GTR) resulted in a material capable of complete repair and recycling (100% efficiency) after temperature-driven protocols, with mechanical properties and a reinforcement index comparable to those of conventional fillers such as silica. This achievement represents a major breakthrough in the field of sustainable composites, as it offers a unique blend of robust mechanical properties and environmental sustainability." },
   { year: "2023", title: "New Recyclable and Self-Healing Elastomer Composites Using Waste from Toner Cartridges", authors: "Utrera-Barrios S, Mart\u00ednez MF, Mas-Giner I, et al.", journal: "Compos. Sci. Technol. 244, 110292 (Q1)", link: "https://doi.org/10.1016/j.compscitech.2023.110292", badges: [{ label: "Q1" }], abstract: "Product recycling reintroduces what is discarded as waste and minimizes the environmental impact on our society. Among the different types of waste from electrical and electronic equipment, toner recycling often falls short, downcycling plastic components. This study introduces an innovative approach in which waste parts from toner cartridges are valorized to develop recyclable and self-healing elastomeric composite materials. The synergy between carboxylated nitrile rubber (XNBR) as the elastomeric phase and high-impact poly(styrene) (HIPS) as the thermoplastic phase derived from toner cartridge waste was explored and optimized. This combination resulted in the creation of a thermoplastic elastomer exhibiting robust mechanical properties and self-healing capabilities with a tensile strength of 6.6 \u00B1 0.2 MPa and a temperature-driven mechanical recovery of 100%. Furthermore, the capacity of toner powder, an integral component of waste, to act as a reinforcing filler was confirmed, with a 50% increase in mechanical strength compared with the unfilled composite. Moreover, an increase in toner content (up to 20 phr) resulted in an optimal balance between tensile strength and self-healing capacity, surpassing the traditional antagonism between these properties. As a result, this research opens a new pathway in the field of self-healing composites and suggests a practical and environmentally friendly approach for managing electronic waste, effectively supporting the principles of Circular Economy." },
   { year: "2023", title: "Self-Healing Elastomers: A Sustainable Solution for Automotive Applications", authors: "Utrera-Barrios S, Verdejo R, L\u00f3pez-Manchado MA, Hern\u00e1ndez Santana M", journal: "Eur. Polym. J. 190, 112023 (D1)", link: "https://doi.org/10.1016/j.eurpolymj.2023.112023", badges: [{ label: "D1", color: "#e3d5b8", textColor: "#7a6a46" }], abstract: "Among the most fruitful material-industry relationships is that of rubber and the automotive industry. Tires, seals, gaskets, hoses, tubes, soft, and damping parts are common applications in an industry that consumes more than 75% of world rubber production. However, this relationship faces significant challenges. The difficulty of reprocessing rubbers due to their irreversible crosslinked network that ensures thermal stability, mechanical robustness and chemical resistance, makes them incompatible with the Circular Economy model. Numerous efforts are coordinated daily to overcome the Linear Economy model and achieve more environmentally friendly rubbers. Strategies like devulcanization, recycling, and self-healing are already being considered by several researchers and industries. Thanks to self-healing, a tire will be able to seal damage due to punctures or cracks. Thanks to self-healing, materials will be able to live longer and thus have an extended lifetime. This review delves into the key concepts of self-healing in the most commonly used elastomeric matrices in the automotive industry. While a more application-oriented approach is still necessary, the first steps have been taken towards future scalability in the sector." },
@@ -763,7 +813,7 @@ export default function App() {
       ::selection{background:#e8e0d4}
       .nav-hamburger{display:none!important}
       @media(max-width:640px){.nav-links-desktop{display:none!important}.nav-hamburger{display:block!important}}
-      .social-link{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;border:1px solid rgba(0,0,0,0.12);color:#888;text-decoration:none;font-size:14px;transition:all 0.3s}
+      .social-link{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;border:1px solid rgba(0,0,0,0.12);color:#888;text-decoration:none;font-size:14px;background:#FCFAF7;transition:all 0.3s}
       .social-link:hover{border-color:#1a1a1a;color:#1a1a1a;transform:translateY(-2px)}
       @media(max-width:768px){.about-grid{grid-template-columns:1fr!important;gap:40px!important}.research-head{font-size:28px!important}.edu-row{grid-template-columns:1fr!important}.chart-grid{grid-template-columns:1fr!important}}
       @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
@@ -802,9 +852,10 @@ function Portfolio({ onNavigate, onOpenNews }) {
         ::selection{background:#e8e0d4}
         .nav-hamburger{display:none!important}
         @media(max-width:640px){.nav-links-desktop{display:none!important}.nav-hamburger{display:block!important}}
-        .social-link{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;border:1px solid rgba(0,0,0,0.12);color:#888;text-decoration:none;font-size:14px;transition:all 0.3s}
+        .social-link{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;border:1px solid rgba(0,0,0,0.12);color:#888;text-decoration:none;font-size:14px;background:#FCFAF7;transition:all 0.3s}
         .social-link:hover{border-color:#1a1a1a;color:#1a1a1a;transform:translateY(-2px)}
-        @media(max-width:768px){.about-grid{grid-template-columns:1fr!important;gap:40px!important}.research-head{font-size:28px!important}.edu-row{grid-template-columns:1fr!important}.chart-grid{grid-template-columns:1fr!important}.hero-latest-news{display:none!important}}
+        .hero-latest-news-mobile{display:none}
+        @media(max-width:768px){.about-grid{grid-template-columns:1fr!important;gap:40px!important}.research-head{font-size:28px!important}.edu-row{grid-template-columns:1fr!important}.chart-grid{grid-template-columns:1fr!important}.award-row{flex-direction:column!important;gap:4px!important;align-items:flex-start!important}.award-row .award-bullet{display:none!important}.hero-latest-news{display:none!important}.hero-latest-news-mobile{display:block!important}}
         @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
         .carousel-scroll::-webkit-scrollbar{height:4px}.carousel-scroll::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
       `}</style>
@@ -842,12 +893,35 @@ function Portfolio({ onNavigate, onOpenNews }) {
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1100, margin: "0 auto", padding: "0 32px", width: "100%" }}>
         <div style={{ paddingTop: 80 }}>
           <Reveal><div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(42px, 7vw, 80px)", fontWeight: 300, lineHeight: 1.08, letterSpacing: "-0.03em" }}>Saul<br /><span style={{ fontWeight: 600 }}>Utrera-Barrios</span></div></Reveal>
-          <Reveal delay={0.15}><div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#888", marginTop: 28, lineHeight: 1.8, fontWeight: 300 }}>Polymer Scientist &middot; Materials Engineer<br />Elastomers and Rubbers &middot; Advanced Materials &middot; Sustainability</div></Reveal>
+          <Reveal delay={0.15}><div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#888", marginTop: 28, lineHeight: 1.8, fontWeight: 300 }}>
+            <SmartSeparatorList items={["Polymer Scientist", "Materials Engineer"]} />
+            <br />
+            <SmartSeparatorList items={["Elastomers and Rubbers", "Advanced Materials", "Sustainability"]} />
+          </div></Reveal>
           <Reveal delay={0.3}><div style={{ display: "flex", gap: 12, marginTop: 36 }}>
             {[{ label: "GS", title: "Google Scholar", href: "https://scholar.google.com/citations?user=i0sFprwAAAAJ&hl=es&oi=ao" },{ label: "OR", title: "ORCID", href: "https://orcid.org/0000-0003-4604-2305" },{ label: "Li", title: "LinkedIn", href: "https://www.linkedin.com/in/sauliutrerab/" }].map(s => (
               <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" className="social-link" title={s.title} style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.02em" }}>{s.label}</a>
             ))}
           </div></Reveal>
+          {NEWS.length > 0 && (
+            <div className="hero-latest-news-mobile" style={{ marginTop: 32 }}>
+              <Reveal delay={0.5}>
+                <div onClick={() => onOpenNews(NEWS[0].slug)} style={{
+                  padding: "14px 16px", display: "flex", alignItems: "center", gap: 12,
+                  background: "#FCFAF7",
+                  border: "1px solid rgba(160, 140, 110, 0.18)",
+                  borderRadius: 12, cursor: "pointer",
+                }}>
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8a7a66", padding: "3px 8px", background: "rgba(232, 224, 212, 0.6)", borderRadius: 100, flexShrink: 0 }}>Latest</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: "#aaa", letterSpacing: "0.04em", marginBottom: 2 }}>{formatDate(NEWS[0].date)}</div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{NEWS[0].title}</div>
+                  </div>
+                  <span style={{ fontSize: 13, color: "#aaa", flexShrink: 0 }}>{"\u2192"}</span>
+                </div>
+              </Reveal>
+            </div>
+          )}
           <Reveal delay={0.45}><div style={{ marginTop: 64 }}><span onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>Scroll <span style={{ display: "inline-block", animation: "bounce 2s infinite" }}>{"\u2193"}</span></span></div></Reveal>
         </div>
         </div>
@@ -888,10 +962,10 @@ function Portfolio({ onNavigate, onOpenNews }) {
         {/* Honors */}
         <Reveal delay={0.1} style={{ marginTop: 80 }}><SLabel>Honors, Awards &amp; Memberships</SLabel></Reveal>
         {AWARDS.map((a, i) => (
-          <Reveal key={i} delay={0.03 * i}><div style={{ padding: "14px 0", borderBottom: "1px solid rgba(0,0,0,0.06)", display: "flex", gap: 20, alignItems: "baseline", flexWrap: "wrap" }}>
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#bbb", minWidth: 40 }}>{a.y}</span>
-            <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600 }}>{a.t}</span>
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#999" }}>&middot; {a.d}</span>
+          <Reveal key={i} delay={0.03 * i}><div className="award-row" style={{ padding: "14px 0", borderBottom: "1px solid rgba(0,0,0,0.06)", display: "flex", gap: 20, alignItems: "baseline", flexWrap: "wrap" }}>
+            <span className="award-year" style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#bbb", minWidth: 40 }}>{a.y}</span>
+            <span className="award-title" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600 }}>{a.t}</span>
+            <span className="award-detail" style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#999" }}><span className="award-bullet">&middot; </span>{a.d}</span>
           </div></Reveal>
         ))}
 
