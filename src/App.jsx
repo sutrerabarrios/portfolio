@@ -94,7 +94,7 @@ function SmartSeparatorList({ items, separator = " \u00B7 ", style = {} }) {
     <span ref={containerRef} style={style}>
       {items.map((item, i) => (
         <span key={i} data-kw style={{ display: "inline-block" }}>
-          {i > 0 && !hideBefore.has(i) && <span style={{ color: "#bbb" }} aria-hidden="true">{separator}</span>}
+          {i > 0 && !hideBefore.has(i) && <span style={{ color: "#bbb", whiteSpace: "pre" }} aria-hidden="true">{separator}</span>}
           <span style={{ whiteSpace: "nowrap" }}>{item}</span>
         </span>
       ))}
