@@ -241,6 +241,8 @@ function PolymerNetwork() {
     let dangling = [];
     let isMobile = window.innerWidth < 768;
     let dpr = window.devicePixelRatio || 1;
+    let lastBuildWidth = 0;
+    let lastBuildHeight = 0;
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
@@ -248,8 +250,36 @@ function PolymerNetwork() {
       canvas.height = rect.height * dpr;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
-      isMobile = window.innerWidth < 768;
-      buildNetwork();
+      const newIsMobile = window.innerWidth < 768;
+
+      // Only rebuild the network if this is a "big" resize:
+      //   - first time (no previous build)
+      //   - mobile <-> desktop transition
+      //   - width changed significantly (orientation change, real resize)
+      // Ignore small height-only changes (mobile URL bar showing/hiding)
+      const widthChange = Math.abs(rect.width - lastBuildWidth);
+      const significantChange = lastBuildWidth === 0
+        || newIsMobile !== isMobile
+        || widthChange > 60;
+
+      isMobile = newIsMobile;
+
+      if (significantChange) {
+        buildNetwork();
+        lastBuildWidth = rect.width;
+        lastBuildHeight = rect.height;
+      } else {
+        // Soft adjust: scale existing node base positions to fit new height
+        // This keeps the same network configuration but adapts to new canvas size
+        if (lastBuildHeight > 0 && rect.height !== lastBuildHeight) {
+          const scaleY = rect.height / lastBuildHeight;
+          crosslinks.forEach(c => {
+            c.baseY *= scaleY;
+            c.y *= scaleY;
+          });
+          lastBuildHeight = rect.height;
+        }
+      }
     }
 
     // Generate N internal control points for a chain (so chains are wavy and can entangle)
