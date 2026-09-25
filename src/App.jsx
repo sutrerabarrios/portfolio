@@ -29,7 +29,7 @@ const NEWS = [
   {
     slug: "website-launch",
     date: "2026-04-30",
-    title: "Welcome to my personal website",
+    title: "Welcome to my personal website!",
     excerpt: "Today I'm launching this space to share my research, teaching, and mentoring journey, and to keep you posted on what comes next.",
     content: "Today I'm launching my personal website, a space to share my work as a polymer scientist, materials engineer, and educator.\n\nHere you'll find an overview of my research on elastomers, advanced polymer materials, and sustainable design; my publications and patents; my teaching and mentoring activities; and a bit about who I am beyond the lab.\n\nThis News section will be my home for sharing what comes next: new publications, grants, awards, conference talks, collaborations, and the next steps in my professional journey, including my goal of becoming a Professor.\n\nThanks for stopping by. I hope you enjoy exploring the site as much as I enjoyed building it.",
     image: null,
